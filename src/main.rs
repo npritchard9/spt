@@ -10,6 +10,7 @@ use std::{
     io::{stdin, stdout, Write},
     str::FromStr,
 };
+use tokio::sync::mpsc::{self, Sender};
 use url_builder::URLBuilder;
 
 enum Command {
@@ -19,17 +20,29 @@ enum Command {
 }
 
 #[derive(Deserialize)]
-struct SpotifyAuthInfo {
-    code: String,
+pub struct SpotifyAuthInfo {
+    pub code: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct SpotifyAccessToken {
+    pub access_token: String,
+    pub token_type: String,
+    pub scope: String,
+    pub expires_in: i64,
+    pub refresh_token: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct SpotifyAccessTokenRes {
-    access_token: String,
-    token_type: String,
-    scope: String,
-    expires_in: i64,
-    refresh_token: String,
+pub struct SpotifyRefreshToken {
+    pub access_token: String,
+    pub token_type: String,
+    pub kscope: String,
+    pub expires_in: i64,
+}
+
+struct AppState {
+    tx: Sender<SpotifyAccessToken>,
 }
 
 impl FromStr for Command {
@@ -58,7 +71,10 @@ fn get_command() -> Command {
 }
 
 #[get("/callback/spotify")]
-async fn spotify_auth(info: web::Query<SpotifyAuthInfo>) -> impl Responder {
+async fn spotify_auth(
+    app_code: web::Query<SpotifyAuthInfo>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
     dotenv().unwrap();
 
     let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
@@ -74,7 +90,7 @@ async fn spotify_auth(info: web::Query<SpotifyAuthInfo>) -> impl Responder {
 
     let client = reqwest::Client::new();
     let params = [
-        ("code", info.code.as_str()),
+        ("code", app_code.code.as_str()),
         ("redirect_uri", redirect_uri),
         ("grant_type", "authorization_code"),
     ];
@@ -85,15 +101,18 @@ async fn spotify_auth(info: web::Query<SpotifyAuthInfo>) -> impl Responder {
         .form(&params)
         .send()
         .await
-        .unwrap()
-        .json::<SpotifyAccessTokenRes>()
+        .expect("the access token request to send")
+        .json::<SpotifyAccessToken>()
         .await
-        .unwrap();
+        .expect("the access token response to decode");
 
-    format!("token: {}", res.access_token)
+    println!("res: {res:?}");
+
+    app_data.tx.send(res.clone()).await.unwrap();
+    format!("token: {}", res.access_token.clone())
 }
 
-async fn gsat() -> Result<(), anyhow::Error> {
+async fn gsat() -> Result<SpotifyAccessToken, anyhow::Error> {
     dotenv()?;
 
     let redirect_uri = "http://localhost:8888/callback/spotify";
@@ -102,11 +121,17 @@ async fn gsat() -> Result<(), anyhow::Error> {
 
     let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
 
+    let (tx, mut rx) = mpsc::channel::<SpotifyAccessToken>(8);
+
     tokio::spawn(async {
-        let server = HttpServer::new(move || App::new().service(spotify_auth))
-            .bind(("127.0.0.1", 8888))
-            .unwrap()
-            .run();
+        let server = HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(AppState { tx: tx.clone() }))
+                .service(spotify_auth)
+        })
+        .bind(("127.0.0.1", 8888))
+        .unwrap()
+        .run();
         server.await.unwrap();
     });
 
@@ -118,12 +143,42 @@ async fn gsat() -> Result<(), anyhow::Error> {
         .add_param("client_id", &spotify_token.to_string())
         .add_param("redirect_uri", redirect_uri);
 
-    if webbrowser::open(ub.build().as_str()).is_ok() {
-        println!("ok")
-    }
+    webbrowser::open(ub.build().as_str())?;
 
-    Ok(())
+    let new_token = rx.recv().await.unwrap();
+    Ok(new_token)
 }
+
+/*async fn refresh_token(refresh_token: String) -> Result<SpotifyRefreshToken, anyhow::Error> {
+    let url = "https://accounts.spotify.com/api/token";
+
+    let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
+    let spotify_secret = env::var("SPOTIFY_SECRET").expect("You need a spotify secret");
+
+    let to_encode = format!("{}:{}", spotify_token, spotify_secret);
+
+    let mut b64 = String::new();
+
+    general_purpose::STANDARD.encode_string(to_encode.as_bytes(), &mut b64);
+
+    let client = reqwest::Client::new();
+    let params = [
+        ("refresh_token", refresh_token),
+        ("grant_type", "refresh_token".to_string()),
+    ];
+    let res = client
+        .post(url)
+        .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(AUTHORIZATION, format!("Basic {}", b64))
+        .form(&params)
+        .send()
+        .await
+        .unwrap()
+        .json::<SpotifyRefreshToken>()
+        .await
+        .unwrap();
+    Ok(res)
+}*/
 
 async fn get_all_playlists(token: String) -> Result<String, anyhow::Error> {
     let url = "https://api.spotify.com/v1/users/np33/playlists";
@@ -137,13 +192,18 @@ async fn get_all_playlists(token: String) -> Result<String, anyhow::Error> {
         .json::<SpotifyAllPlaylistsRes>()
         .await?;
 
-    println!("{res:#?}");
+    for playlist in res.items.iter() {
+        println!(
+            "{} | {} | {}",
+            playlist.name, playlist.owner.display_name, playlist.id
+        );
+    }
 
-    Ok("".to_string())
+    Ok("playlists worked".to_string())
 }
 
-async fn get_playlist(token: String) -> Result<String, anyhow::Error> {
-    let url = "https://api.spotify.com/v1/playlists/6TJf8ZqOqqRzN2GIldqT4g";
+/*async fn get_playlist(token: String, id: String) -> Result<String, anyhow::Error> {
+    let url = format!("https://api.spotify.com/v1/playlists/{}", id);
 
     let client = reqwest::Client::new();
     let res = client
@@ -168,13 +228,17 @@ async fn get_playlist(token: String) -> Result<String, anyhow::Error> {
         );
     }
     Ok("".to_string())
-}
+}*/
 
 #[tokio::main]
 async fn main() {
-    gsat().await.unwrap();
-    // get_all_playlists(access_token.clone()).await.unwrap();
-    // get_playlist(access_token.clone()).await.unwrap();
+    let access_token = gsat().await.unwrap();
+    get_all_playlists(access_token.access_token.clone())
+        .await
+        .unwrap();
+    // get_playlist(access_token.clone(), "6TJf8ZqOqqRzN2GIldqT4g".to_string())
+    //     .await
+    //     .unwrap();
     loop {
         match get_command() {
             Command::Search => {

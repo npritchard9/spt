@@ -5,17 +5,17 @@ use serde_json::Value;
 #[serde(rename_all = "camelCase")]
 pub struct SpotifyAllPlaylistsRes {
     pub href: String,
+    pub items: Vec<Item>,
     pub limit: i64,
     pub next: Value,
     pub offset: i64,
     pub previous: Value,
     pub total: i64,
-    pub items: Items,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Items {
+pub struct Item {
     pub collaborative: bool,
     pub description: String,
     #[serde(rename = "external_urls")]
@@ -25,6 +25,8 @@ pub struct Items {
     pub images: Vec<Image>,
     pub name: String,
     pub owner: Owner,
+    #[serde(rename = "primary_color")]
+    pub primary_color: Value,
     pub public: bool,
     #[serde(rename = "snapshot_id")]
     pub snapshot_id: String,
@@ -32,8 +34,6 @@ pub struct Items {
     #[serde(rename = "type")]
     pub type_field: String,
     pub uri: String,
-    #[serde(rename = "primary_color")]
-    pub primary_color: Value,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
