@@ -1,6 +1,7 @@
 use actix_web::{get, web, App, HttpServer, Responder};
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine as _};
+use db::check_refresh;
 use dotenvy::dotenv;
 use playlist::models::{all_playlists::SpotifyAllPlaylistsRes, playlist::SpotifyPlaylistRes};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
@@ -10,8 +11,11 @@ use std::{
     io::{stdin, stdout, Write},
     str::FromStr,
 };
+use surrealdb::{engine::local::Db, Surreal};
 use tokio::sync::mpsc::{self, Sender};
 use url_builder::URLBuilder;
+
+mod db;
 
 enum Command {
     Search = 1,
@@ -37,7 +41,7 @@ pub struct SpotifyAccessToken {
 pub struct SpotifyRefreshToken {
     pub access_token: String,
     pub token_type: String,
-    pub kscope: String,
+    pub scope: String,
     pub expires_in: i64,
 }
 
@@ -149,7 +153,8 @@ async fn gsat() -> Result<SpotifyAccessToken, anyhow::Error> {
     Ok(new_token)
 }
 
-/*async fn refresh_token(refresh_token: String) -> Result<SpotifyRefreshToken, anyhow::Error> {
+async fn refresh_token(refresh_token: String) -> Result<SpotifyRefreshToken, anyhow::Error> {
+    dotenv()?;
     let url = "https://accounts.spotify.com/api/token";
 
     let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
@@ -178,15 +183,29 @@ async fn gsat() -> Result<SpotifyAccessToken, anyhow::Error> {
         .await
         .unwrap();
     Ok(res)
-}*/
+}
 
-async fn get_all_playlists(token: String) -> Result<String, anyhow::Error> {
+async fn get_all_playlists(
+    db: &Surreal<Db>,
+    spotify_token: SpotifyAccessToken,
+) -> Result<String, anyhow::Error> {
+    if db::check_refresh(&db)
+        .await
+        .expect("Couldn't check the token refresh")
+    {
+        let new_token = refresh_token(spotify_token.refresh_token.clone())
+            .await
+            .expect("Should be able to handle refresh");
+        db::handle_refresh_token(&db, new_token.access_token)
+            .await
+            .expect("Should be able to update the token");
+    }
     let url = "https://api.spotify.com/v1/users/np33/playlists";
 
     let client = reqwest::Client::new();
     let res = client
         .get(url)
-        .bearer_auth(token)
+        .bearer_auth(spotify_token.access_token.clone())
         .send()
         .await?
         .json::<SpotifyAllPlaylistsRes>()
@@ -232,10 +251,43 @@ async fn get_all_playlists(token: String) -> Result<String, anyhow::Error> {
 
 #[tokio::main]
 async fn main() {
-    let access_token = gsat().await.unwrap();
-    get_all_playlists(access_token.access_token.clone())
+    let db = db::get_db().await.expect("The db should exist");
+    let mut access_token: Option<SpotifyAccessToken> = None;
+    let db_token = db::select_token(&db).await.unwrap();
+    match db_token {
+        Some(token) => {
+            access_token = Some(SpotifyAccessToken {
+                access_token: token.access_token,
+                token_type: token.token_type,
+                scope: token.scope,
+                expires_in: token.expires_in,
+                refresh_token: token.refresh_token,
+            });
+            println!("You have a token already.")
+        }
+        None => {
+            let new_token = gsat().await.unwrap();
+            db::insert_token(&db, new_token.clone()).await.unwrap();
+            access_token = Some(new_token.clone());
+            println!("Fetched an access token.");
+        }
+    }
+
+    if check_refresh(&db)
         .await
-        .unwrap();
+        .expect("Should be able to check refresh")
+    {
+        if let Some(ref mut token) = access_token.clone() {
+            let refreshed_response_token =
+                refresh_token(token.refresh_token.clone()).await.unwrap();
+            token.access_token = refreshed_response_token.access_token;
+        }
+    }
+    // if let Some(token) = access_token.clone() {
+    //     db::insert_token(&db, token.clone())
+    //         .await
+    //         .expect("The token should be inserted in the db");
+    // }
     // get_playlist(access_token.clone(), "6TJf8ZqOqqRzN2GIldqT4g".to_string())
     //     .await
     //     .unwrap();
@@ -244,7 +296,12 @@ async fn main() {
             Command::Search => {
                 println!("search")
             }
-            Command::View => println!("view"),
+            Command::View => {
+                if let Some(token) = access_token.clone() {
+                    get_all_playlists(&db, token).await.unwrap();
+                    println!("Showing playlists")
+                }
+            }
             Command::Quit => break,
         };
     }
