@@ -49,7 +49,7 @@ pub async fn check_refresh(db: &Surreal<Db>) -> surrealdb::Result<bool> {
             let token: DBToken = token;
             let curr = SystemTime::now();
             let elapsed = curr.duration_since(token.time).unwrap();
-            Ok(elapsed > Duration::new(30, 0))
+            Ok(elapsed > Duration::new(3600, 0))
         }
         Err(e) => Err(e),
     }

@@ -45,6 +45,20 @@ pub struct SpotifyRefreshToken {
     pub expires_in: i64,
 }
 
+#[derive(Debug)]
+pub struct Playlist {
+    name: String,
+    owner: String,
+    id: String,
+}
+
+#[derive(Debug)]
+pub struct Song {
+    name: String,
+    album: String,
+    artist: String,
+}
+
 struct AppState {
     tx: Sender<SpotifyAccessToken>,
 }
@@ -65,8 +79,8 @@ impl FromStr for Command {
 fn get_command() -> Command {
     let mut input = String::new();
     println!("What do you want to do?");
-    println!("1. Search for a song.");
-    println!("2. View your playlist.");
+    println!("1. View your playlists.");
+    println!("2. View songs in a playlist.");
     println!("3. Quit.");
     stdout().flush().unwrap();
     stdin().read_line(&mut input).unwrap();
@@ -185,10 +199,11 @@ async fn refresh_token(refresh_token: String) -> Result<SpotifyRefreshToken, any
     Ok(res)
 }
 
+// this also checks if we need a refresh
 async fn get_all_playlists(
     db: &Surreal<Db>,
     spotify_token: SpotifyAccessToken,
-) -> Result<String, anyhow::Error> {
+) -> Result<Vec<Playlist>, anyhow::Error> {
     if db::check_refresh(&db)
         .await
         .expect("Couldn't check the token refresh")
@@ -211,23 +226,25 @@ async fn get_all_playlists(
         .json::<SpotifyAllPlaylistsRes>()
         .await?;
 
+    let mut playlists: Vec<Playlist> = vec![];
     for playlist in res.items.iter() {
-        println!(
-            "{} | {} | {}",
-            playlist.name, playlist.owner.display_name, playlist.id
-        );
+        playlists.push(Playlist {
+            name: playlist.name.clone(),
+            owner: playlist.owner.display_name.clone(),
+            id: playlist.id.clone(),
+        })
     }
 
-    Ok("playlists worked".to_string())
+    Ok(playlists)
 }
 
-/*async fn get_playlist(token: String, id: String) -> Result<String, anyhow::Error> {
+async fn get_playlist(token: SpotifyAccessToken, id: String) -> Result<Vec<Song>, anyhow::Error> {
     let url = format!("https://api.spotify.com/v1/playlists/{}", id);
 
     let client = reqwest::Client::new();
     let res = client
         .get(url)
-        .bearer_auth(token)
+        .bearer_auth(token.access_token)
         .query(&[
             ("market", "US"),
             (
@@ -240,14 +257,16 @@ async fn get_all_playlists(
         .json::<SpotifyPlaylistRes>()
         .await?;
 
+    let mut songs: Vec<Song> = vec![];
     for song in res.tracks.items.iter() {
-        println!(
-            "{} | {} | {}",
-            song.track.name, song.track.album.name, song.track.artists[0].name
-        );
+        songs.push(Song {
+            name: song.track.name.clone(),
+            album: song.track.album.name.clone(),
+            artist: song.track.artists[0].name.clone(),
+        })
     }
-    Ok("".to_string())
-}*/
+    Ok(songs)
+}
 
 #[tokio::main]
 async fn main() {
@@ -294,12 +313,40 @@ async fn main() {
     loop {
         match get_command() {
             Command::Search => {
-                println!("search")
+                if let Some(token) = access_token.clone() {
+                    let playlists = get_all_playlists(&db, token.clone())
+                        .await
+                        .expect("There should be playlists to return");
+                    for playlist in playlists.iter() {
+                        println!("{} | {}", playlist.name, playlist.owner)
+                    }
+
+                    let mut p_input = String::new();
+                    println!("Enter the name of a playlist:");
+                    stdout().flush().unwrap();
+                    stdin().read_line(&mut p_input).unwrap();
+                    let p_name = p_input.trim();
+                    let curr_playlist = playlists
+                        .iter()
+                        .find(|p| p.name == p_name)
+                        .expect("User must enter a valid playlist name");
+
+                    let songs = get_playlist(token.clone(), curr_playlist.id.clone())
+                        .await
+                        .expect("There should be playlists to return");
+                    for song in songs {
+                        println!("{} | {} | {}", song.name, song.artist, song.album)
+                    }
+                }
             }
             Command::View => {
                 if let Some(token) = access_token.clone() {
-                    get_all_playlists(&db, token).await.unwrap();
-                    println!("Showing playlists")
+                    let playlists = get_all_playlists(&db, token)
+                        .await
+                        .expect("There should be playlists to return");
+                    for playlist in playlists {
+                        println!("{} | {}", playlist.name, playlist.owner)
+                    }
                 }
             }
             Command::Quit => break,

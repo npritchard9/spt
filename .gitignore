@@ -1,4 +1,4 @@
 /target
 .env
 
-/src/temp.db
+temp.db
