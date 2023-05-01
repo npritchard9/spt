@@ -1,26 +1,15 @@
 use super::{Playlist, Song, SpotifyAccessToken};
-use crate::auth::*;
-use crate::db;
-use playlist::models::{all_playlists::SpotifyAllPlaylistsRes, playlist::SpotifyPlaylistRes};
-use surrealdb::{engine::local::Db, Surreal};
+use playlist::models::{
+    all_playlists::SpotifyAllPlaylistsRes, currently_playing::SpotifyCurrentlyPlayingRes,
+    playlist::SpotifyPlaylistRes,
+};
+use reqwest::header::CONTENT_LENGTH;
 
 // this also checks if we need a refresh
 pub async fn get_all_playlists(
-    db: &Surreal<Db>,
     spotify_token: SpotifyAccessToken,
 ) -> Result<Vec<Playlist>, anyhow::Error> {
-    if db::check_refresh(&db)
-        .await
-        .expect("Couldn't check the token refresh")
-    {
-        let new_token = refresh_token(spotify_token.refresh_token.clone())
-            .await
-            .expect("Should be able to handle refresh");
-        db::handle_refresh_token(&db, new_token.access_token)
-            .await
-            .expect("Should be able to update the token");
-    }
-    let url = "https://api.spotify.com/v1/users/np33/playlists";
+    let url = "https://api.spotify.com/v1/me/playlists";
 
     let client = reqwest::Client::new();
     let res = client
@@ -74,4 +63,43 @@ pub async fn get_playlist(
         })
     }
     Ok(songs)
+}
+
+pub async fn get_currently_playing(
+    spotify_token: SpotifyAccessToken,
+) -> Result<Song, anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/currently-playing";
+
+    let client = reqwest::Client::new();
+    let res = client
+        .get(url)
+        .bearer_auth(spotify_token.access_token.clone())
+        .query(&[("market", "US")])
+        .send()
+        .await?
+        .json::<SpotifyCurrentlyPlayingRes>()
+        .await?;
+
+    let song: Song = Song {
+        name: res.item.name,
+        album: res.item.album.name,
+        artist: res.item.artists[0].name.clone(),
+    };
+
+    Ok(song)
+}
+
+pub async fn skip_to_next(spotify_token: SpotifyAccessToken) -> Result<Song, anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/next";
+
+    let client = reqwest::Client::new();
+    client
+        .post(url)
+        .bearer_auth(spotify_token.access_token.clone())
+        .header(CONTENT_LENGTH, 0)
+        .send()
+        .await?;
+
+    let song = get_currently_playing(spotify_token).await?;
+    Ok(song)
 }

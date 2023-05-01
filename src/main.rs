@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use std::{
+    fmt::Display,
     io::{stdin, stdout, Write},
     str::FromStr,
 };
@@ -9,12 +10,14 @@ mod db;
 mod spotify;
 
 use auth::*;
-use db::check_refresh;
+use db::{check_refresh, handle_refresh_token};
 use spotify::*;
 
 enum Command {
     View = 1,
     Search,
+    GetCurrent,
+    SkipToNext,
     Logout,
     Quit,
 }
@@ -33,6 +36,12 @@ pub struct Song {
     artist: String,
 }
 
+impl Display for Song {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{} | {} | {}", self.name, self.artist, self.album)
+    }
+}
+
 impl FromStr for Command {
     type Err = anyhow::Error;
 
@@ -40,8 +49,10 @@ impl FromStr for Command {
         match s {
             "1" => Ok(Command::View),
             "2" => Ok(Command::Search),
-            "3" => Ok(Command::Logout),
-            "4" => Ok(Command::Quit),
+            "3" => Ok(Command::GetCurrent),
+            "4" => Ok(Command::SkipToNext),
+            "5" => Ok(Command::Logout),
+            "6" => Ok(Command::Quit),
             _ => Err(anyhow!("Invalid command.")),
         }
     }
@@ -52,8 +63,10 @@ fn get_command() -> Command {
     println!("What do you want to do?");
     println!("1. View your playlists.");
     println!("2. View songs in a playlist.");
-    println!("3. Logout.");
-    println!("4. Quit.");
+    println!("3. View current song.");
+    println!("4. Skip to next song.");
+    println!("5. Logout.");
+    println!("6. Quit.");
     stdout().flush().unwrap();
     stdin().read_line(&mut input).unwrap();
     let command = input.trim().parse::<Command>().unwrap();
@@ -74,7 +87,7 @@ async fn main() {
                 expires_in: token.expires_in,
                 refresh_token: token.refresh_token,
             });
-            println!("You have a token already.")
+            println!("You have a token already.",)
         }
         None => {
             let new_token = gsat().await.unwrap();
@@ -91,6 +104,9 @@ async fn main() {
         if let Some(ref mut token) = access_token.clone() {
             let refreshed_response_token =
                 refresh_token(token.refresh_token.clone()).await.unwrap();
+            handle_refresh_token(&db, refreshed_response_token.access_token.clone())
+                .await
+                .expect("Should be able to update the db with the new token");
             token.access_token = refreshed_response_token.access_token;
         }
     }
@@ -98,7 +114,8 @@ async fn main() {
         match get_command() {
             Command::Search => {
                 if let Some(token) = access_token.clone() {
-                    let playlists = get_all_playlists(&db, token.clone())
+                    println!("token: {}", token.access_token.clone());
+                    let playlists = get_all_playlists(token.clone())
                         .await
                         .expect("There should be playlists to return");
                     for playlist in playlists.iter() {
@@ -119,18 +136,37 @@ async fn main() {
                         .await
                         .expect("There should be playlists to return");
                     for song in songs {
-                        println!("{} | {} | {}", song.name, song.artist, song.album)
+                        println!("{song}")
                     }
                 }
             }
             Command::View => {
                 if let Some(token) = access_token.clone() {
-                    let playlists = get_all_playlists(&db, token)
+                    println!("token: {}", token.access_token.clone());
+                    let playlists = get_all_playlists(token)
                         .await
                         .expect("There should be playlists to return");
                     for playlist in playlists {
                         println!("{} | {}", playlist.name, playlist.owner)
                     }
+                }
+            }
+            Command::GetCurrent => {
+                if let Some(token) = access_token.clone() {
+                    println!("token: {}", token.access_token.clone());
+                    let song = get_currently_playing(token)
+                        .await
+                        .expect("There should be a current song");
+                    println!("{song}")
+                }
+            }
+            Command::SkipToNext => {
+                if let Some(token) = access_token.clone() {
+                    println!("token: {}", token.access_token.clone());
+                    let song = skip_to_next(token)
+                        .await
+                        .expect("There should be a next song");
+                    println!("{song}")
                 }
             }
             Command::Logout => {

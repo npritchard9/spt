@@ -80,7 +80,7 @@ pub async fn gsat() -> Result<SpotifyAccessToken, anyhow::Error> {
 
     let redirect_uri = "http://localhost:8888/callback/spotify";
 
-    let scope = "playlist-read-private playlist-read-collaborative";
+    let scope = "playlist-read-private playlist-read-collaborative user-read-currently-playing user-modify-playback-state";
 
     let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
 
