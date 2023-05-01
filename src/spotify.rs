@@ -1,8 +1,6 @@
+use super::{Playlist, Song, SpotifyAccessToken};
 use crate::auth::*;
 use crate::db;
-use crate::Playlist;
-use crate::Song;
-use crate::SpotifyAccessToken;
 use playlist::models::{all_playlists::SpotifyAllPlaylistsRes, playlist::SpotifyPlaylistRes};
 use surrealdb::{engine::local::Db, Surreal};
 
@@ -45,7 +43,10 @@ pub async fn get_all_playlists(
     Ok(playlists)
 }
 
-pub async fn get_playlist(token: SpotifyAccessToken, id: String) -> Result<Vec<Song>, anyhow::Error> {
+pub async fn get_playlist(
+    token: SpotifyAccessToken,
+    id: String,
+) -> Result<Vec<Song>, anyhow::Error> {
     let url = format!("https://api.spotify.com/v1/playlists/{}", id);
 
     let client = reqwest::Client::new();

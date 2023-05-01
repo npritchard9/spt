@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use db::check_refresh;
 use std::{
     io::{stdin, stdout, Write},
     str::FromStr,
@@ -9,8 +8,9 @@ mod auth;
 mod db;
 mod spotify;
 
-use crate::auth::*;
-use crate::spotify::*;
+use auth::*;
+use db::check_refresh;
+use spotify::*;
 
 enum Command {
     View = 1,
