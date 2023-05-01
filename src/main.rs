@@ -1,9 +1,5 @@
-use anyhow::anyhow;
-use std::{
-    fmt::Display,
-    io::{stdin, stdout, Write},
-    str::FromStr,
-};
+use clap::{arg, command};
+use std::fmt::Display;
 
 mod auth;
 mod db;
@@ -12,15 +8,6 @@ mod spotify;
 use auth::*;
 use db::{check_refresh, handle_refresh_token};
 use spotify::*;
-
-enum Command {
-    View = 1,
-    Search,
-    GetCurrent,
-    SkipToNext,
-    Logout,
-    Quit,
-}
 
 #[derive(Debug)]
 pub struct Playlist {
@@ -40,37 +27,6 @@ impl Display for Song {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{} | {} | {}", self.name, self.artist, self.album)
     }
-}
-
-impl FromStr for Command {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "1" => Ok(Command::View),
-            "2" => Ok(Command::Search),
-            "3" => Ok(Command::GetCurrent),
-            "4" => Ok(Command::SkipToNext),
-            "5" => Ok(Command::Logout),
-            "6" => Ok(Command::Quit),
-            _ => Err(anyhow!("Invalid command.")),
-        }
-    }
-}
-
-fn get_command() -> Command {
-    let mut input = String::new();
-    println!("What do you want to do?");
-    println!("1. View your playlists.");
-    println!("2. View songs in a playlist.");
-    println!("3. View current song.");
-    println!("4. Skip to next song.");
-    println!("5. Logout.");
-    println!("6. Quit.");
-    stdout().flush().unwrap();
-    stdin().read_line(&mut input).unwrap();
-    let command = input.trim().parse::<Command>().unwrap();
-    command
 }
 
 #[tokio::main]
@@ -110,72 +66,83 @@ async fn main() {
             token.access_token = refreshed_response_token.access_token;
         }
     }
-    loop {
-        match get_command() {
-            Command::Search => {
-                if let Some(token) = access_token.clone() {
-                    println!("token: {}", token.access_token.clone());
-                    let playlists = get_all_playlists(token.clone())
-                        .await
-                        .expect("There should be playlists to return");
-                    for playlist in playlists.iter() {
-                        println!("{} | {}", playlist.name, playlist.owner)
-                    }
+    let matches = command!()
+        .arg(arg!(-p --playlist <NAME> "Search a playlist").required(false))
+        .arg(arg!(-a --playlists ... "View all playlists").required(false))
+        .arg(arg!(-n --next ... "Skip to next song").required(false))
+        .arg(arg!(-c --current ... "View current song").required(false))
+        .arg(arg!(-l --logout ... "Logout").required(false))
+        .get_matches();
+    if let Some(name) = matches.get_one::<String>("playlist") {
+        println!("Searching for: {}", name.trim());
+        if let Some(token) = access_token.clone() {
+            println!("token: {}", token.access_token.clone());
+            let playlists = get_all_playlists(token.clone())
+                .await
+                .expect("There should be playlists to return");
+            // for playlist in playlists.iter() {
+            //     println!("{} | {}", playlist.name, playlist.owner)
+            // }
 
-                    let mut p_input = String::new();
-                    println!("Enter the name of a playlist:");
-                    stdout().flush().unwrap();
-                    stdin().read_line(&mut p_input).unwrap();
-                    let p_name = p_input.trim();
-                    let curr_playlist = playlists
-                        .iter()
-                        .find(|p| p.name == p_name)
-                        .expect("User must enter a valid playlist name");
+            let name = name.trim();
+            let curr_playlist = playlists
+                .iter()
+                .find(|p| p.name == name)
+                .expect("User must enter a valid playlist name");
 
-                    let songs = get_playlist(token.clone(), curr_playlist.id.clone())
-                        .await
-                        .expect("There should be playlists to return");
-                    for song in songs {
-                        println!("{song}")
-                    }
-                }
+            let songs = get_playlist(token.clone(), curr_playlist.id.clone())
+                .await
+                .expect("There should be playlists to return");
+            for song in songs {
+                println!("{song}")
             }
-            Command::View => {
-                if let Some(token) = access_token.clone() {
-                    println!("token: {}", token.access_token.clone());
-                    let playlists = get_all_playlists(token)
-                        .await
-                        .expect("There should be playlists to return");
-                    for playlist in playlists {
-                        println!("{} | {}", playlist.name, playlist.owner)
-                    }
-                }
-            }
-            Command::GetCurrent => {
-                if let Some(token) = access_token.clone() {
-                    println!("token: {}", token.access_token.clone());
-                    let song = get_currently_playing(token)
-                        .await
-                        .expect("There should be a current song");
-                    println!("{song}")
-                }
-            }
-            Command::SkipToNext => {
-                if let Some(token) = access_token.clone() {
-                    println!("token: {}", token.access_token.clone());
-                    let song = skip_to_next(token)
-                        .await
-                        .expect("There should be a next song");
-                    println!("{song}")
-                }
-            }
-            Command::Logout => {
-                db::delete_token(&db)
+        }
+    };
+    match matches.get_one::<u8>("playlists") {
+        Some(0) => (),
+        _ => {
+            if let Some(token) = access_token.clone() {
+                println!("token: {}", token.access_token.clone());
+                let playlists = get_all_playlists(token)
                     .await
-                    .expect("User was able to logout");
-                println!("Logged out successfully.")
+                    .expect("There should be playlists to return");
+                for playlist in playlists {
+                    println!("{} | {}", playlist.name, playlist.owner)
+                }
             }
-            Command::Quit => break,
-        };
-    }
+        }
+    };
+    match matches.get_one::<u8>("next") {
+        Some(0) => (),
+        _ => {
+            if let Some(token) = access_token.clone() {
+                println!("token: {}", token.access_token.clone());
+                let song = skip_to_next(token)
+                    .await
+                    .expect("There should be a next song");
+                println!("{song}")
+            }
+        }
+    };
+    match matches.get_one::<u8>("current") {
+        Some(0) => (),
+        _ => {
+            if let Some(token) = access_token.clone() {
+                println!("token: {}", token.access_token.clone());
+                let song = get_currently_playing(token)
+                    .await
+                    .expect("There should be a current song");
+                println!("{song}")
+            }
+        }
+    };
+    match matches.get_one::<u8>("logout") {
+        Some(0) => (),
+        _ => {
+            db::delete_token(&db)
+                .await
+                .expect("User was able to logout");
+            println!("Logged out successfully.")
+        }
+    };
 }

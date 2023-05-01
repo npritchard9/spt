@@ -18,3 +18,4 @@ tokio = { version = "1.28.0", features = ["full"] }
 url-builder = "0.1.1"
 webbrowser = "0.8.9"
 surrealdb = { version = "1.0.0-beta.9", features = ["kv-rocksdb"] }
+clap = { version = "4.2.5", features = ["cargo"] }
