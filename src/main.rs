@@ -65,13 +65,9 @@ async fn main() {
         .arg(arg!(-q --logout ... "Logout").required(false))
         .get_matches();
     if let Some(name) = matches.get_one::<String>("playlist") {
-        println!("Searching for: {}", name.trim());
         let playlists = get_all_playlists(token.clone())
             .await
             .expect("There should be playlists to return");
-        // for playlist in playlists.iter() {
-        //     println!("{} | {}", playlist.name, playlist.owner)
-        // }
 
         let name = name.trim();
         let curr_playlist = playlists
