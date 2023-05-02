@@ -9,7 +9,7 @@ mod db;
 mod spotify;
 
 use auth::*;
-use db::{check_refresh, update_token};
+use db::{check_refresh, update_token, ClientCredentials};
 use spotify::*;
 
 #[derive(Debug)]
@@ -36,9 +36,39 @@ impl Display for Song {
 #[tokio::main]
 async fn main() {
     let db = db::get_db().await.expect("The db should exist");
+    let creds = db::select_credentials(&db)
+        .await
+        .expect("Credentials to exist");
+    if creds.is_none() {
+        let mut input = String::new();
+        println!("Enter spotify client id:");
+        stdout().flush().unwrap();
+        stdin().read_line(&mut input).unwrap();
+        let client_id = input.trim();
+        let mut input = String::new();
+        println!("Enter spotify client secret:");
+        stdout().flush().unwrap();
+        stdin().read_line(&mut input).unwrap();
+        let secret = input.trim();
+        db::insert_client_credentials(
+            &db,
+            ClientCredentials {
+                client_id: client_id.to_string(),
+                secret: secret.to_string(),
+            },
+        )
+        .await
+        .expect("Should be able to insert client creds");
+    }
+    let creds = db::select_credentials(&db)
+        .await
+        .expect("Credentials to exist")
+        .expect("And to be real");
     let db_token = db::select_token(&db).await.expect("A db token to exist");
     if db_token.is_none() {
-        let new_token = gsat().await.unwrap();
+        let new_token = gsat(creds.client_id.clone(), creds.secret.clone())
+            .await
+            .unwrap();
         db::insert_token(&db, new_token).await.unwrap();
         println!("Fetched a new access token.");
     }
@@ -48,7 +78,13 @@ async fn main() {
     {
         println!("Refreshing token...");
         if let Some(token) = db_token {
-            let refreshed_token = refresh_token(token.refresh_token).await.unwrap();
+            let refreshed_token = refresh_token(
+                token.refresh_token,
+                creds.client_id.clone(),
+                creds.secret.clone(),
+            )
+            .await
+            .unwrap();
             update_token(&db, refreshed_token.access_token.clone())
                 .await
                 .expect("Should be able to update the db with the new token");
@@ -151,6 +187,9 @@ async fn main() {
     match matches.get_one::<u8>("logout") {
         Some(0) => (),
         _ => {
+            db::delete_credentials(&db)
+                .await
+                .expect("Was able to delete credentials");
             db::delete_token(&db)
                 .await
                 .expect("User was able to logout");

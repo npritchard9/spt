@@ -15,6 +15,41 @@ pub struct DBToken {
     pub time: SystemTime,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientCredentials {
+    pub client_id: String,
+    pub secret: String,
+}
+
+pub async fn insert_client_credentials(
+    db: &Surreal<Db>,
+    creds: ClientCredentials,
+) -> surrealdb::Result<()> {
+    let existing_creds: Option<ClientCredentials> = db.select(("app", "creds")).await?;
+    if existing_creds.is_some() {
+        let _creds: String = db
+            .delete(("app", "creds"))
+            .await
+            .expect("should be able to delete creds");
+    }
+    let _creds: ClientCredentials = db
+        .create(("app", "creds"))
+        .content(creds)
+        .await
+        .expect("should be able to create creds");
+    Ok(())
+}
+
+pub async fn select_credentials(db: &Surreal<Db>) -> surrealdb::Result<Option<ClientCredentials>> {
+    let creds: Option<ClientCredentials> = db.select(("app", "creds")).await?;
+    Ok(creds)
+}
+
+pub async fn delete_credentials(db: &Surreal<Db>) -> surrealdb::Result<()> {
+    let _creds: Vec<ClientCredentials> = db.delete("app").await?;
+    Ok(())
+}
+
 pub async fn insert_token(
     db: &Surreal<Db>,
     old_token: SpotifyAccessToken,

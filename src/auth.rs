@@ -1,14 +1,14 @@
 use actix_web::{get, web, App, HttpServer, Responder};
 use base64::{engine::general_purpose, Engine as _};
-use dotenvy::dotenv;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde::Deserialize;
-use std::env;
 use tokio::sync::mpsc::{self, Sender};
 use url_builder::URLBuilder;
 
 pub struct AppState {
     pub tx: Sender<SpotifyAccessToken>,
+    pub id: String,
+    pub secret: String,
 }
 
 #[derive(Deserialize)]
@@ -38,14 +38,12 @@ pub async fn spotify_auth(
     app_code: web::Query<SpotifyAuthInfo>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    dotenv().unwrap();
-
-    let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
-    let spotify_secret = env::var("SPOTIFY_SECRET").expect("You need a spotify secret");
+    let spotify_id = app_data.id.clone();
+    let spotify_secret = app_data.secret.clone();
 
     let redirect_uri = "http://localhost:8888/callback/spotify";
 
-    let to_encode = format!("{}:{}", spotify_token, spotify_secret);
+    let to_encode = format!("{}:{}", spotify_id, spotify_secret);
 
     let mut b64 = String::new();
 
@@ -73,21 +71,26 @@ pub async fn spotify_auth(
     format!("token: {}", res.access_token.clone())
 }
 
-pub async fn gsat() -> Result<SpotifyAccessToken, anyhow::Error> {
-    dotenv()?;
-
+pub async fn gsat(
+    spotify_id: String,
+    spotify_secret: String,
+) -> Result<SpotifyAccessToken, anyhow::Error> {
     let redirect_uri = "http://localhost:8888/callback/spotify";
 
     let scope = "playlist-read-private playlist-read-collaborative user-read-currently-playing user-modify-playback-state";
 
-    let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
-
     let (tx, mut rx) = mpsc::channel::<SpotifyAccessToken>(8);
+
+    let id = spotify_id.clone();
 
     tokio::spawn(async {
         let server = HttpServer::new(move || {
             App::new()
-                .app_data(web::Data::new(AppState { tx: tx.clone() }))
+                .app_data(web::Data::new(AppState {
+                    tx: tx.clone(),
+                    id: id.clone(),
+                    secret: spotify_secret.clone(),
+                }))
                 .service(spotify_auth)
         })
         .bind(("127.0.0.1", 8888))
@@ -101,7 +104,7 @@ pub async fn gsat() -> Result<SpotifyAccessToken, anyhow::Error> {
         .set_host("accounts.spotify.com/authorize")
         .add_param("response_type", "code")
         .add_param("scope", scope)
-        .add_param("client_id", &spotify_token.to_string())
+        .add_param("client_id", spotify_id.clone().as_str())
         .add_param("redirect_uri", redirect_uri);
 
     webbrowser::open(ub.build().as_str())?;
@@ -110,14 +113,10 @@ pub async fn gsat() -> Result<SpotifyAccessToken, anyhow::Error> {
     Ok(new_token)
 }
 
-pub async fn refresh_token(refresh_token: String) -> Result<SpotifyRefreshToken, anyhow::Error> {
-    dotenv()?;
+pub async fn refresh_token(refresh_token: String, spotify_id: String, spotify_secret: String) -> Result<SpotifyRefreshToken, anyhow::Error> {
     let url = "https://accounts.spotify.com/api/token";
 
-    let spotify_token = env::var("SPOTIFY_ACCESS_TOKEN").expect("You need a spotify token");
-    let spotify_secret = env::var("SPOTIFY_SECRET").expect("You need a spotify secret");
-
-    let to_encode = format!("{}:{}", spotify_token, spotify_secret);
+    let to_encode = format!("{}:{}", spotify_id, spotify_secret);
 
     let mut b64 = String::new();
 
