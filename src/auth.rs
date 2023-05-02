@@ -38,12 +38,9 @@ pub async fn spotify_auth(
     app_code: web::Query<SpotifyAuthInfo>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    let spotify_id = app_data.id.clone();
-    let spotify_secret = app_data.secret.clone();
-
     let redirect_uri = "http://localhost:8888/callback/spotify";
 
-    let to_encode = format!("{}:{}", spotify_id, spotify_secret);
+    let to_encode = format!("{}:{}", app_data.id, app_data.secret);
 
     let mut b64 = String::new();
 
@@ -113,7 +110,11 @@ pub async fn gsat(
     Ok(new_token)
 }
 
-pub async fn refresh_token(refresh_token: String, spotify_id: String, spotify_secret: String) -> Result<SpotifyRefreshToken, anyhow::Error> {
+pub async fn refresh_token(
+    refresh_token: String,
+    spotify_id: String,
+    spotify_secret: String,
+) -> Result<SpotifyRefreshToken, anyhow::Error> {
     let url = "https://accounts.spotify.com/api/token";
 
     let to_encode = format!("{}:{}", spotify_id, spotify_secret);
