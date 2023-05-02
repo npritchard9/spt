@@ -5,7 +5,7 @@ use surrealdb::Surreal;
 
 use crate::SpotifyAccessToken;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DBToken {
     pub access_token: String,
     pub refresh_token: String,
@@ -49,18 +49,15 @@ pub async fn check_refresh(db: &Surreal<Db>) -> surrealdb::Result<bool> {
             let token: DBToken = token;
             let curr = SystemTime::now();
             let elapsed = curr.duration_since(token.time).unwrap();
-            Ok(elapsed > Duration::new(3600, 0))
+            Ok(elapsed > Duration::new(token.expires_in as u64, 0))
         }
         Err(e) => Err(e),
     }
 }
 
-pub async fn handle_refresh_token(
-    db: &Surreal<Db>,
-    new_access_token: String,
-) -> surrealdb::Result<()> {
+pub async fn update_token(db: &Surreal<Db>, new_access_token: String) -> surrealdb::Result<()> {
     let old_token: DBToken = db.select(("token", "noah")).await?;
-    let new_token: DBToken = db
+    let _new_token: DBToken = db
         .update(("token", "noah"))
         .content(DBToken {
             access_token: new_access_token,
@@ -71,7 +68,7 @@ pub async fn handle_refresh_token(
             expires_in: old_token.expires_in,
         })
         .await?;
-    println!("updated token: {:?}", new_token);
+    println!("updated token");
     Ok(())
 }
 

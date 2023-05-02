@@ -6,7 +6,7 @@ mod db;
 mod spotify;
 
 use auth::*;
-use db::{check_refresh, handle_refresh_token};
+use db::{check_refresh, update_token};
 use spotify::*;
 
 #[derive(Debug)]
@@ -32,23 +32,14 @@ impl Display for Song {
 #[tokio::main]
 async fn main() {
     let db = db::get_db().await.expect("The db should exist");
-    let mut access_token: Option<SpotifyAccessToken> = None;
-    let db_token = db::select_token(&db).await.unwrap();
+    let db_token = db::select_token(&db).await.expect("A db token to exist");
     match db_token {
-        Some(token) => {
-            access_token = Some(SpotifyAccessToken {
-                access_token: token.access_token,
-                token_type: token.token_type,
-                scope: token.scope,
-                expires_in: token.expires_in,
-                refresh_token: token.refresh_token,
-            });
+        Some(_) => {
             println!("You have a token already.",)
         }
         None => {
             let new_token = gsat().await.unwrap();
             db::insert_token(&db, new_token.clone()).await.unwrap();
-            access_token = Some(new_token.clone());
             println!("Fetched an access token.");
         }
     }
@@ -57,15 +48,28 @@ async fn main() {
         .await
         .expect("Should be able to check refresh")
     {
-        if let Some(ref mut token) = access_token.clone() {
-            let refreshed_response_token =
-                refresh_token(token.refresh_token.clone()).await.unwrap();
-            handle_refresh_token(&db, refreshed_response_token.access_token.clone())
+        println!("Refreshing token...");
+        if let Some(ref token) = db_token {
+            let refreshed_token = refresh_token(token.refresh_token.clone()).await.unwrap();
+            update_token(&db, refreshed_token.access_token.clone())
                 .await
                 .expect("Should be able to update the db with the new token");
-            token.access_token = refreshed_response_token.access_token;
         }
     }
+
+    let db_token = db::select_token(&db)
+        .await
+        .expect("A db token to exist")
+        .expect("The new db token to exist");
+
+    let access_token = Some(SpotifyAccessToken {
+        access_token: db_token.access_token,
+        token_type: db_token.token_type,
+        scope: db_token.scope,
+        expires_in: db_token.expires_in,
+        refresh_token: db_token.refresh_token,
+    });
+
     let matches = command!()
         .arg(arg!(-p --playlist <NAME> "Search a playlist").required(false))
         .arg(arg!(-a --playlists ... "View all playlists").required(false))
