@@ -62,6 +62,7 @@ async fn main() {
         .arg(arg!(-n --next ... "Skip to next song").required(false))
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
+        .arg(arg!(-s --search <QUERY> "Search spotify").required(false))
         .arg(arg!(-q --logout ... "Logout").required(false))
         .get_matches();
     if let Some(name) = matches.get_one::<String>("playlist") {
@@ -79,6 +80,16 @@ async fn main() {
             .await
             .expect("There should be playlists to return");
         for song in songs {
+            println!("{song}")
+        }
+    };
+    if let Some(query) = matches.get_one::<String>("search") {
+        let query = query.trim();
+        let search_res = search_for_item(token.clone(), query)
+            .await
+            .expect("There should be playlists to return");
+
+        for song in search_res {
             println!("{song}")
         }
     };

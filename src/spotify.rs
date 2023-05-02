@@ -1,11 +1,10 @@
 use super::{Playlist, Song, SpotifyAccessToken};
 use playlist::models::{
     all_playlists::SpotifyAllPlaylistsRes, currently_playing::SpotifyCurrentlyPlayingRes,
-    playlist::SpotifyPlaylistRes,
+    playlist::SpotifyPlaylistRes, search::SpotifySearchRes,
 };
 use reqwest::header::CONTENT_LENGTH;
 
-// this also checks if we need a refresh
 pub async fn get_all_playlists(
     spotify_token: SpotifyAccessToken,
 ) -> Result<Vec<Playlist>, anyhow::Error> {
@@ -115,4 +114,37 @@ pub async fn skip_to_prev(spotify_token: SpotifyAccessToken) -> Result<(), anyho
         .await?;
 
     Ok(())
+}
+
+pub async fn search_for_item(
+    spotify_token: SpotifyAccessToken,
+    q: &str,
+) -> Result<Vec<Song>, anyhow::Error> {
+    let url = "https://api.spotify.com/v1/search";
+
+    let client = reqwest::Client::new();
+    let res = client
+        .get(url)
+        .bearer_auth(spotify_token.access_token.clone())
+        .query(&[
+            ("q", q),
+            ("market", "US"),
+            ("type", "track"),
+            ("limit", "5"),
+        ])
+        .send()
+        .await?
+        .json::<SpotifySearchRes>()
+        .await?;
+
+    let mut songs: Vec<Song> = vec![];
+    for song in res.tracks.items.iter() {
+        songs.push(Song {
+            name: song.name.clone(),
+            album: song.album.name.clone(),
+            artist: song.artists[0].name.clone(),
+        })
+    }
+
+    Ok(songs)
 }
