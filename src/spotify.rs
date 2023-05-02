@@ -13,18 +13,18 @@ pub async fn get_all_playlists(
     let client = reqwest::Client::new();
     let res = client
         .get(url)
-        .bearer_auth(spotify_token.access_token.clone())
+        .bearer_auth(spotify_token.access_token)
         .send()
         .await?
         .json::<SpotifyAllPlaylistsRes>()
         .await?;
 
     let mut playlists: Vec<Playlist> = vec![];
-    for playlist in res.items.iter() {
+    for playlist in res.items {
         playlists.push(Playlist {
-            name: playlist.name.clone(),
-            owner: playlist.owner.display_name.clone(),
-            id: playlist.id.clone(),
+            name: playlist.name,
+            owner: playlist.owner.display_name,
+            id: playlist.id,
         })
     }
 
@@ -54,11 +54,12 @@ pub async fn get_playlist(
         .await?;
 
     let mut songs: Vec<Song> = vec![];
-    for song in res.tracks.items.iter() {
+    for song in res.tracks.items {
         songs.push(Song {
-            name: song.track.name.clone(),
-            album: song.track.album.name.clone(),
+            name: song.track.name,
+            album: song.track.album.name,
             artist: song.track.artists[0].name.clone(),
+            uri: "".to_string(),
         })
     }
     Ok(songs)
@@ -72,7 +73,7 @@ pub async fn get_currently_playing(
     let client = reqwest::Client::new();
     let res = client
         .get(url)
-        .bearer_auth(spotify_token.access_token.clone())
+        .bearer_auth(spotify_token.access_token)
         .query(&[("market", "US")])
         .send()
         .await?
@@ -83,6 +84,7 @@ pub async fn get_currently_playing(
         name: res.item.name,
         album: res.item.album.name,
         artist: res.item.artists[0].name.clone(),
+        uri: "".to_string(),
     };
 
     Ok(song)
@@ -94,7 +96,7 @@ pub async fn skip_to_next(spotify_token: SpotifyAccessToken) -> Result<(), anyho
     let client = reqwest::Client::new();
     client
         .post(url)
-        .bearer_auth(spotify_token.access_token.clone())
+        .bearer_auth(spotify_token.access_token)
         .header(CONTENT_LENGTH, 0)
         .send()
         .await?;
@@ -108,7 +110,7 @@ pub async fn skip_to_prev(spotify_token: SpotifyAccessToken) -> Result<(), anyho
     let client = reqwest::Client::new();
     client
         .post(url)
-        .bearer_auth(spotify_token.access_token.clone())
+        .bearer_auth(spotify_token.access_token)
         .header(CONTENT_LENGTH, 0)
         .send()
         .await?;
@@ -125,7 +127,7 @@ pub async fn search_for_item(
     let client = reqwest::Client::new();
     let res = client
         .get(url)
-        .bearer_auth(spotify_token.access_token.clone())
+        .bearer_auth(spotify_token.access_token)
         .query(&[
             ("q", q),
             ("market", "US"),
@@ -138,13 +140,32 @@ pub async fn search_for_item(
         .await?;
 
     let mut songs: Vec<Song> = vec![];
-    for song in res.tracks.items.iter() {
+    for song in res.tracks.items {
         songs.push(Song {
-            name: song.name.clone(),
-            album: song.album.name.clone(),
+            name: song.name,
+            album: song.album.name,
             artist: song.artists[0].name.clone(),
+            uri: song.uri,
         })
     }
 
     Ok(songs)
+}
+
+pub async fn add_to_queue(
+    spotify_token: SpotifyAccessToken,
+    uri: String,
+) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/queue";
+
+    let client = reqwest::Client::new();
+    client
+        .post(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_LENGTH, 0)
+        .query(&[("uri", uri)])
+        .send()
+        .await?;
+
+    Ok(())
 }

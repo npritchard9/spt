@@ -1,5 +1,8 @@
 use clap::{arg, command};
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    io::{stdin, stdout, Write},
+};
 
 mod auth;
 mod db;
@@ -21,6 +24,7 @@ pub struct Song {
     name: String,
     album: String,
     artist: String,
+    uri: String,
 }
 
 impl Display for Song {
@@ -89,8 +93,23 @@ async fn main() {
             .await
             .expect("There should be playlists to return");
 
-        for song in search_res {
-            println!("{song}")
+        for (i, song) in search_res.iter().enumerate() {
+            println!("{}. {song}", i + 1);
+        }
+        println!("\nEnter a number to add a song to queue, or q to exit");
+        let mut input = String::new();
+        stdout().flush().unwrap();
+        stdin().read_line(&mut input).unwrap();
+        let input = input.trim();
+        match input {
+            "q" => (),
+            _ => {
+                let index = input.parse::<usize>().unwrap();
+                let uri = search_res[index - 1].uri.clone();
+                add_to_queue(token.clone(), uri)
+                    .await
+                    .expect("Should be able to add to queue");
+            }
         }
     };
     match matches.get_one::<u8>("playlists") {
