@@ -38,8 +38,11 @@ pub async fn delete_token(db: &Surreal<Db>) -> surrealdb::Result<()> {
     Ok(())
 }
 
-pub async fn select_token(db: &Surreal<Db>) -> surrealdb::Result<Option<DBToken>> {
-    let token: Option<DBToken> = db.select(("token", "noah")).await?;
+pub async fn select_token(db: &Surreal<Db>) -> surrealdb::Result<Option<SpotifyAccessToken>> {
+    let sql = "SELECT access_token, refresh_token, token_type, scope, expires_in FROM type::table($table);";
+    let mut result = db.query(sql).bind(("table", "token")).await?;
+    let token: Option<SpotifyAccessToken> = result.take(0)?;
+    // let token: Option<DBToken> = db.select(("token", "noah")).await?;
     Ok(token)
 }
 
