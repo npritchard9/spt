@@ -1,11 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SpotifyTokenRes {
-    pub access_token: String,
-    pub token_type: String,
-    pub expires_in: usize,
-}
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpotifyPlaylistRes {
