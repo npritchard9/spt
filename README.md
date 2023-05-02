@@ -1,0 +1,2 @@
+# spt
+spotify terminal client
