@@ -35,7 +35,7 @@ async fn main() {
     let db_token = db::select_token(&db).await.expect("A db token to exist");
     match db_token {
         Some(_) => {
-            println!("You have a token already.",)
+            println!("You have a token already.")
         }
         None => {
             let new_token = gsat().await.unwrap();

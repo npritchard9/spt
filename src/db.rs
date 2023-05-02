@@ -76,7 +76,7 @@ pub async fn update_token(db: &Surreal<Db>, new_access_token: String) -> surreal
 }
 
 pub async fn get_db() -> surrealdb::Result<Surreal<Db>> {
-    let db = Surreal::new::<File>("temp.db").await?;
+    let db = Surreal::new::<File>("/home/noah/.surrealdb/data/spotify.db").await?;
     db.use_ns("my_ns").use_db("my_db").await?;
 
     Ok(db)
