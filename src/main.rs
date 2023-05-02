@@ -33,17 +33,11 @@ impl Display for Song {
 async fn main() {
     let db = db::get_db().await.expect("The db should exist");
     let db_token = db::select_token(&db).await.expect("A db token to exist");
-    match db_token {
-        Some(_) => {
-            println!("You have a token already.")
-        }
-        None => {
-            let new_token = gsat().await.unwrap();
-            db::insert_token(&db, new_token).await.unwrap();
-            println!("Fetched an access token.");
-        }
+    if db_token.is_none() {
+        let new_token = gsat().await.unwrap();
+        db::insert_token(&db, new_token).await.unwrap();
+        println!("Fetched a new access token.");
     }
-
     if check_refresh(&db)
         .await
         .expect("Should be able to check refresh")
@@ -63,11 +57,12 @@ async fn main() {
         .expect("The new db token to exist by now");
 
     let matches = command!()
-        .arg(arg!(-p --playlist <NAME> "Search a playlist").required(false))
+        .arg(arg!(-l --playlist <NAME> "Search a playlist").required(false))
         .arg(arg!(-a --playlists ... "View all playlists").required(false))
         .arg(arg!(-n --next ... "Skip to next song").required(false))
+        .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
-        .arg(arg!(-l --logout ... "Logout").required(false))
+        .arg(arg!(-q --logout ... "Logout").required(false))
         .get_matches();
     if let Some(name) = matches.get_one::<String>("playlist") {
         println!("Searching for: {}", name.trim());
@@ -105,10 +100,17 @@ async fn main() {
     match matches.get_one::<u8>("next") {
         Some(0) => (),
         _ => {
-            let song = skip_to_next(token.clone())
+            skip_to_next(token.clone())
                 .await
                 .expect("There should be a next song");
-            println!("{song}")
+        }
+    };
+    match matches.get_one::<u8>("prev") {
+        Some(0) => (),
+        _ => {
+            skip_to_prev(token.clone())
+                .await
+                .expect("There should be a previous song");
         }
     };
     match matches.get_one::<u8>("current") {

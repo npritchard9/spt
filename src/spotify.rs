@@ -89,7 +89,7 @@ pub async fn get_currently_playing(
     Ok(song)
 }
 
-pub async fn skip_to_next(spotify_token: SpotifyAccessToken) -> Result<Song, anyhow::Error> {
+pub async fn skip_to_next(spotify_token: SpotifyAccessToken) -> Result<(), anyhow::Error> {
     let url = "https://api.spotify.com/v1/me/player/next";
 
     let client = reqwest::Client::new();
@@ -100,6 +100,19 @@ pub async fn skip_to_next(spotify_token: SpotifyAccessToken) -> Result<Song, any
         .send()
         .await?;
 
-    let song = get_currently_playing(spotify_token).await?;
-    Ok(song)
+    Ok(())
+}
+
+pub async fn skip_to_prev(spotify_token: SpotifyAccessToken) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/previous";
+
+    let client = reqwest::Client::new();
+    client
+        .post(url)
+        .bearer_auth(spotify_token.access_token.clone())
+        .header(CONTENT_LENGTH, 0)
+        .send()
+        .await?;
+
+    Ok(())
 }
