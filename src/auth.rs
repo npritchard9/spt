@@ -69,8 +69,6 @@ pub async fn spotify_auth(
         .await
         .expect("the access token response to decode");
 
-    println!("res: {res:?}");
-
     app_data.tx.send(res.clone()).await.unwrap();
     format!("token: {}", res.access_token.clone())
 }

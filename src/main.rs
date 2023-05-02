@@ -71,7 +71,6 @@ async fn main() {
         .get_matches();
     if let Some(name) = matches.get_one::<String>("playlist") {
         println!("Searching for: {}", name.trim());
-        println!("token: {}", token.access_token.clone());
         let playlists = get_all_playlists(token.clone())
             .await
             .expect("There should be playlists to return");
@@ -95,7 +94,6 @@ async fn main() {
     match matches.get_one::<u8>("playlists") {
         Some(0) => (),
         _ => {
-            println!("token: {}", token.access_token.clone());
             let playlists = get_all_playlists(token.clone())
                 .await
                 .expect("There should be playlists to return");
@@ -107,7 +105,6 @@ async fn main() {
     match matches.get_one::<u8>("next") {
         Some(0) => (),
         _ => {
-            println!("token: {}", token.access_token.clone());
             let song = skip_to_next(token.clone())
                 .await
                 .expect("There should be a next song");
@@ -117,7 +114,6 @@ async fn main() {
     match matches.get_one::<u8>("current") {
         Some(0) => (),
         _ => {
-            println!("token: {}", token.access_token.clone());
             let song = get_currently_playing(token.clone())
                 .await
                 .expect("There should be a current song");
