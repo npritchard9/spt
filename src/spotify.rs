@@ -222,3 +222,21 @@ pub async fn start_playing(
 
     Ok(())
 }
+
+pub async fn shuffle(
+    spotify_token: SpotifyAccessToken,
+    shuffle_state: bool,
+) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/shuffle";
+
+    let client = reqwest::Client::new();
+    client
+        .put(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_LENGTH, 0)
+        .query(&[("state", shuffle_state)])
+        .send()
+        .await?;
+
+    Ok(())
+}

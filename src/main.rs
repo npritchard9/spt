@@ -105,6 +105,7 @@ async fn main() {
         .arg(arg!(-n --next ... "Skip to next song").required(false))
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
+        .arg(arg!(-m --shuffle <STATE>... "Shuffle Y/N").required(false))
         .arg(arg!(-s --search <QUERY> "Search spotify").required(false))
         .arg(arg!(-q --logout ... "Logout").required(false))
         .get_matches();
@@ -167,6 +168,19 @@ async fn main() {
         start_playing(token.clone(), uris)
             .await
             .expect("Should be able to play the song");
+    };
+    if let Some(state) = matches.get_one::<String>("shuffle") {
+        let state = state.trim().to_lowercase();
+        let shuffle_state = {
+            if state == "y" {
+                true
+            } else {
+                false
+            }
+        };
+        shuffle(token.clone(), shuffle_state)
+            .await
+            .expect("Should be able to shuffle");
     };
     match matches.get_one::<u8>("playlists") {
         Some(0) => (),
