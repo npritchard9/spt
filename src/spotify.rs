@@ -169,3 +169,35 @@ pub async fn add_to_queue(
 
     Ok(())
 }
+
+pub async fn pause(
+    spotify_token: SpotifyAccessToken,
+) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/pause";
+
+    let client = reqwest::Client::new();
+    client
+        .put(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_LENGTH, 0)
+        .send()
+        .await?;
+
+    Ok(())
+}
+
+pub async fn resume(
+    spotify_token: SpotifyAccessToken,
+) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/play";
+
+    let client = reqwest::Client::new();
+    client
+        .put(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_LENGTH, 0)
+        .send()
+        .await?;
+
+    Ok(())
+}

@@ -99,6 +99,8 @@ async fn main() {
     let matches = command!()
         .arg(arg!(-l --playlist <NAME> "Search a playlist").required(false))
         .arg(arg!(-a --playlists ... "View all playlists").required(false))
+        .arg(arg!(-x --pause ... "Pause playback").required(false))
+        .arg(arg!(-r --resume ... "Resume playback").required(false))
         .arg(arg!(-n --next ... "Skip to next song").required(false))
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
@@ -157,6 +159,20 @@ async fn main() {
             for playlist in playlists {
                 println!("{} | {}", playlist.name, playlist.owner)
             }
+        }
+    };
+    match matches.get_one::<u8>("pause") {
+        Some(0) => (),
+        _ => {
+            pause(token.clone()).await.expect("Should be able to pause");
+        }
+    };
+    match matches.get_one::<u8>("resume") {
+        Some(0) => (),
+        _ => {
+            resume(token.clone())
+                .await
+                .expect("Should be able to resume");
         }
     };
     match matches.get_one::<u8>("next") {
