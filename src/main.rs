@@ -106,6 +106,7 @@ async fn main() {
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
         .arg(arg!(-m --shuffle <STATE> "Shuffle Y/N").required(false))
+        .arg(arg!(-t --repeat <STATE> "Repeat (track, context, off)").required(false))
         .arg(arg!(-s --search <QUERY> "Search spotify").required(false))
         .arg(arg!(-u --update <QUERY> "Add tracks to a playlist").required(false))
         .arg(arg!(-q --logout ... "Logout").required(false))
@@ -231,6 +232,13 @@ async fn main() {
             }
         };
         shuffle(token.clone(), shuffle_state)
+            .await
+            .expect("Should be able to shuffle");
+    };
+    // make things like this into an enum
+    if let Some(state) = matches.get_one::<String>("repeat") {
+        let state = state.trim().to_lowercase();
+        repeat(token.clone(), state)
             .await
             .expect("Should be able to shuffle");
     };

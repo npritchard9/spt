@@ -241,6 +241,24 @@ pub async fn shuffle(
     Ok(())
 }
 
+pub async fn repeat(
+    spotify_token: SpotifyAccessToken,
+    repeat_state: String,
+) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/repeat";
+
+    let client = reqwest::Client::new();
+    client
+        .put(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_LENGTH, 0)
+        .query(&[("state", repeat_state)])
+        .send()
+        .await?;
+
+    Ok(())
+}
+
 pub async fn add_to_playlist(
     spotify_token: SpotifyAccessToken,
     pid: String,
