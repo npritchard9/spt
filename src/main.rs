@@ -97,7 +97,7 @@ async fn main() {
         .expect("The new db token to exist by now");
 
     let matches = command!()
-        .arg(arg!(-l --playlist <NAME> "Search a playlist").required(false))
+        .arg(arg!(-P --playlist <NAME> "Search a playlist").required(false))
         .arg(arg!(-a --playlists ... "View all playlists").required(false))
         .arg(arg!(-x --pause ... "Pause playback").required(false))
         .arg(arg!(-r --resume ... "Resume playback").required(false))
@@ -105,8 +105,8 @@ async fn main() {
         .arg(arg!(-n --next ... "Skip to next song").required(false))
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
-        .arg(arg!(-m --shuffle <STATE> "Shuffle Y/N").required(false))
-        .arg(arg!(-t --repeat <STATE> "Repeat (track, context, off)").required(false))
+        .arg(arg!(-S --shuffle <STATE> "Shuffle Y/N").required(false))
+        .arg(arg!(-R --repeat <STATE> "Repeat (track, context, off)").required(false))
         .arg(arg!(-s --search <QUERY> "Search spotify").required(false))
         .arg(arg!(-u --update <QUERY> "Add tracks to a playlist").required(false))
         .arg(arg!(-q --logout ... "Logout").required(false))
