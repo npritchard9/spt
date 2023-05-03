@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct SpotifyCurrentlyPlayingRes {
     pub timestamp: i64,
-    pub context: Context,
+    pub context: Option<Context>,
     #[serde(rename = "progress_ms")]
     pub progress_ms: i64,
     pub item: Item,
