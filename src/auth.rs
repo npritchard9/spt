@@ -74,7 +74,7 @@ pub async fn gsat(
 ) -> Result<SpotifyAccessToken, anyhow::Error> {
     let redirect_uri = "http://localhost:8888/callback/spotify";
 
-    let scope = "playlist-read-private playlist-read-collaborative user-read-currently-playing user-modify-playback-state";
+    let scope = "playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-read-currently-playing user-modify-playback-state";
 
     let (tx, mut rx) = mpsc::channel::<SpotifyAccessToken>(8);
 

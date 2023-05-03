@@ -7,7 +7,7 @@ use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-struct StartPlayingJSON {
+struct SpotifyJSON {
     uris: Vec<String>,
 }
 
@@ -209,7 +209,7 @@ pub async fn start_playing(
     uris: Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let url = "https://api.spotify.com/v1/me/player/play";
-    let json = StartPlayingJSON { uris };
+    let json = SpotifyJSON { uris };
 
     let client = reqwest::Client::new();
     client
@@ -236,6 +236,28 @@ pub async fn shuffle(
         .header(CONTENT_LENGTH, 0)
         .query(&[("state", shuffle_state)])
         .send()
+        .await?;
+
+    Ok(())
+}
+
+pub async fn add_to_playlist(
+    spotify_token: SpotifyAccessToken,
+    pid: String,
+    uris: Vec<String>,
+) -> Result<(), anyhow::Error> {
+    let url = format!("https://api.spotify.com/v1/playlists/{}/tracks", pid);
+    let json = SpotifyJSON { uris };
+
+    let client = reqwest::Client::new();
+    client
+        .post(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_TYPE, "application/json")
+        .json(&json)
+        .send()
+        .await?
+        .text()
         .await?;
 
     Ok(())

@@ -105,8 +105,9 @@ async fn main() {
         .arg(arg!(-n --next ... "Skip to next song").required(false))
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
-        .arg(arg!(-m --shuffle <STATE>... "Shuffle Y/N").required(false))
+        .arg(arg!(-m --shuffle <STATE> "Shuffle Y/N").required(false))
         .arg(arg!(-s --search <QUERY> "Search spotify").required(false))
+        .arg(arg!(-u --update <QUERY> "Add tracks to a playlist").required(false))
         .arg(arg!(-q --logout ... "Logout").required(false))
         .get_matches();
     if let Some(name) = matches.get_one::<String>("playlist") {
@@ -131,7 +132,7 @@ async fn main() {
         let query = query.trim();
         let search_res = search_for_item(token.clone(), query)
             .await
-            .expect("There should be playlists to return");
+            .expect("There should be search results to return");
 
         for (i, song) in search_res.iter().enumerate() {
             println!("{}. {song}", i + 1);
@@ -149,6 +150,57 @@ async fn main() {
                 add_to_queue(token.clone(), uri.clone())
                     .await
                     .expect("Should be able to add to queue");
+            }
+        }
+    };
+    if let Some(query) = matches.get_one::<String>("update") {
+        let query = query.trim();
+        let search_res = search_for_item(token.clone(), query)
+            .await
+            .expect("There should be search results to return");
+
+        println!("Songs:");
+        for (i, song) in search_res.iter().enumerate() {
+            println!("{}. {song}", i + 1);
+        }
+        println!("Your playlists:");
+        let playlists = get_all_playlists(token.clone())
+            .await
+            .expect("There should be playlists to return");
+        for playlist in playlists.iter() {
+            println!("{} | {}", playlist.name, playlist.owner)
+        }
+        println!("\nEnter the name of a playlist to add songs to, or q to exit");
+        let mut input = String::new();
+        stdout().flush().unwrap();
+        stdin().read_line(&mut input).unwrap();
+        let playlist_name = input.trim();
+        //not sure if this return works
+        if playlist_name == "q" {
+            ()
+        }
+        let curr_playlist = playlists.iter().find(|p| p.name == playlist_name).unwrap();
+        let pid = curr_playlist.id.clone();
+        let prompt = format!(
+            "\nEnter comma-separated numbers to add songs to {}, or q to exit",
+            playlist_name
+        );
+        println!("{}", prompt);
+        let mut input = String::new();
+        stdout().flush().unwrap();
+        stdin().read_line(&mut input).unwrap();
+        let ids = input.trim();
+        match ids {
+            "q" => (),
+            _ => {
+                let uris: Vec<String> = ids
+                    .split(",")
+                    .map(|id| id.parse::<usize>().unwrap() - 1)
+                    .map(|id| search_res[id].uri.clone())
+                    .collect();
+                add_to_playlist(token.clone(), pid, uris)
+                    .await
+                    .expect("To be able to add songs to playlist");
             }
         }
     };
