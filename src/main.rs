@@ -101,6 +101,7 @@ async fn main() {
         .arg(arg!(-a --playlists ... "View all playlists").required(false))
         .arg(arg!(-x --pause ... "Pause playback").required(false))
         .arg(arg!(-r --resume ... "Resume playback").required(false))
+        .arg(arg!(-e --start <QUERY> "Start playing QUERY related songs").required(false))
         .arg(arg!(-n --next ... "Skip to next song").required(false))
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
@@ -144,11 +145,28 @@ async fn main() {
             _ => {
                 let index = input.parse::<usize>().unwrap();
                 let uri = search_res[index - 1].uri.clone();
-                add_to_queue(token.clone(), uri)
+                add_to_queue(token.clone(), uri.clone())
                     .await
                     .expect("Should be able to add to queue");
             }
         }
+    };
+    if let Some(query) = matches.get_one::<String>("start") {
+        let query = query.trim();
+        let search_res = search_for_item(token.clone(), query)
+            .await
+            .expect("There should be playlists to return");
+        println!("Playing the following songs:");
+        for song in search_res.iter() {
+            println!("{song}");
+        }
+        let mut uris = vec![];
+        for song in search_res {
+            uris.push(song.uri);
+        }
+        start_playing(token.clone(), uris)
+            .await
+            .expect("Should be able to play the song");
     };
     match matches.get_one::<u8>("playlists") {
         Some(0) => (),

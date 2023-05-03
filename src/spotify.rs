@@ -3,7 +3,13 @@ use playlist::models::{
     all_playlists::SpotifyAllPlaylistsRes, currently_playing::SpotifyCurrentlyPlayingRes,
     playlist::SpotifyPlaylistRes, search::SpotifySearchRes,
 };
-use reqwest::header::CONTENT_LENGTH;
+use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StartPlayingJSON {
+    uris: Vec<String>,
+}
 
 pub async fn get_all_playlists(
     spotify_token: SpotifyAccessToken,
@@ -170,9 +176,7 @@ pub async fn add_to_queue(
     Ok(())
 }
 
-pub async fn pause(
-    spotify_token: SpotifyAccessToken,
-) -> Result<(), anyhow::Error> {
+pub async fn pause(spotify_token: SpotifyAccessToken) -> Result<(), anyhow::Error> {
     let url = "https://api.spotify.com/v1/me/player/pause";
 
     let client = reqwest::Client::new();
@@ -186,9 +190,7 @@ pub async fn pause(
     Ok(())
 }
 
-pub async fn resume(
-    spotify_token: SpotifyAccessToken,
-) -> Result<(), anyhow::Error> {
+pub async fn resume(spotify_token: SpotifyAccessToken) -> Result<(), anyhow::Error> {
     let url = "https://api.spotify.com/v1/me/player/play";
 
     let client = reqwest::Client::new();
@@ -196,6 +198,25 @@ pub async fn resume(
         .put(url)
         .bearer_auth(spotify_token.access_token)
         .header(CONTENT_LENGTH, 0)
+        .send()
+        .await?;
+
+    Ok(())
+}
+
+pub async fn start_playing(
+    spotify_token: SpotifyAccessToken,
+    uris: Vec<String>,
+) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/play";
+    let json = StartPlayingJSON { uris };
+
+    let client = reqwest::Client::new();
+    client
+        .put(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_TYPE, "application/json")
+        .json(&json)
         .send()
         .await?;
 
