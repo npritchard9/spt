@@ -105,6 +105,7 @@ async fn main() {
         .arg(arg!(-n --next ... "Skip to next song").required(false))
         .arg(arg!(-p --prev ... "Skip to previous song").required(false))
         .arg(arg!(-c --current ... "View current song").required(false))
+        .arg(arg!(-C --add_current ... "Add current song to playlist").required(false))
         .arg(arg!(-S --shuffle <STATE> "Shuffle Y/N").required(false))
         .arg(arg!(-R --repeat <STATE> "Repeat (track, context, off)").required(false))
         .arg(arg!(-s --search <QUERY> "Search spotify").required(false))
@@ -302,6 +303,14 @@ async fn main() {
                 .await
                 .expect("User was able to logout");
             println!("Logged out successfully.")
+        }
+    };
+    match matches.get_one::<u8>("add_current") {
+        Some(0) => (),
+        _ => {
+            add_current_to_playlist(token.clone())
+                .await
+                .expect("Should be able to add current song to playlist");
         }
     };
 }

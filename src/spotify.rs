@@ -90,7 +90,7 @@ pub async fn get_currently_playing(
         name: res.item.name,
         album: res.item.album.name,
         artist: res.item.artists[0].name.clone(),
-        uri: "".to_string(),
+        uri: res.item.uri,
     };
 
     Ok(song)
@@ -265,6 +265,36 @@ pub async fn add_to_playlist(
     uris: Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let url = format!("https://api.spotify.com/v1/playlists/{}/tracks", pid);
+    let json = SpotifyJSON { uris };
+
+    let client = reqwest::Client::new();
+    client
+        .post(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_TYPE, "application/json")
+        .json(&json)
+        .send()
+        .await?
+        .text()
+        .await?;
+
+    Ok(())
+}
+
+pub async fn add_current_to_playlist(
+    spotify_token: SpotifyAccessToken,
+) -> Result<(), anyhow::Error> {
+    let all_pls = get_all_playlists(spotify_token.clone()).await?;
+    let songs_pl = all_pls
+        .iter()
+        .find(|p| p.name == "songs")
+        .expect("songs playlist to exist");
+    let url = format!(
+        "https://api.spotify.com/v1/playlists/{}/tracks",
+        songs_pl.id
+    );
+    let curr_song = get_currently_playing(spotify_token.clone()).await?;
+    let uris = vec![curr_song.uri];
     let json = SpotifyJSON { uris };
 
     let client = reqwest::Client::new();
