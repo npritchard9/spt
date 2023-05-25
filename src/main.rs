@@ -110,6 +110,7 @@ async fn main() {
         .arg(arg!(-R --repeat <STATE> "Repeat (track, context, off)").required(false))
         .arg(arg!(-s --search <QUERY> "Search spotify").required(false))
         .arg(arg!(-u --update <QUERY> "Add tracks to a playlist").required(false))
+        .arg(arg!(-v --volume <NUMBER> "Set playback volume").required(false))
         .arg(arg!(-q --logout ... "Logout").required(false))
         .get_matches();
     if let Some(name) = matches.get_one::<String>("playlist") {
@@ -241,7 +242,20 @@ async fn main() {
         let state = state.trim().to_lowercase();
         repeat(token.clone(), state)
             .await
-            .expect("Should be able to shuffle");
+            .expect("Should be able to repeat");
+    };
+    if let Some(num) = matches.get_one::<String>("volume") {
+        const MAX_VOLUME: usize = 100;
+        let mut num = num
+            .trim()
+            .parse::<usize>()
+            .expect("The volume to be a number");
+        if num > MAX_VOLUME {
+            num = MAX_VOLUME;
+        }
+        volume(token.clone(), num)
+            .await
+            .expect("Should be able to set volume");
     };
     match matches.get_one::<u8>("playlists") {
         Some(0) => (),

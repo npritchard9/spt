@@ -310,3 +310,21 @@ pub async fn add_current_to_playlist(
 
     Ok(())
 }
+
+pub async fn volume(
+    spotify_token: SpotifyAccessToken,
+    percentage: usize,
+) -> Result<(), anyhow::Error> {
+    let url = "https://api.spotify.com/v1/me/player/volume";
+
+    let client = reqwest::Client::new();
+    client
+        .put(url)
+        .bearer_auth(spotify_token.access_token)
+        .header(CONTENT_LENGTH, 0)
+        .query(&[("volume_percent", percentage)])
+        .send()
+        .await?;
+
+    Ok(())
+}
