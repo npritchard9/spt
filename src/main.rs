@@ -179,31 +179,33 @@ async fn main() {
         stdin().read_line(&mut input).unwrap();
         let playlist_name = input.trim();
         //not sure if this return works
-        if playlist_name == "q" {
-            ()
-        }
-        let curr_playlist = playlists.iter().find(|p| p.name == playlist_name).unwrap();
-        let pid = curr_playlist.id.clone();
-        let prompt = format!(
-            "\nEnter comma-separated numbers to add songs to {}, or q to exit",
-            playlist_name
-        );
-        println!("{}", prompt);
-        let mut input = String::new();
-        stdout().flush().unwrap();
-        stdin().read_line(&mut input).unwrap();
-        let ids = input.trim();
-        match ids {
+        match playlist_name {
             "q" => (),
             _ => {
-                let uris: Vec<String> = ids
-                    .split(",")
-                    .map(|id| id.parse::<usize>().unwrap() - 1)
-                    .map(|id| search_res[id].uri.clone())
-                    .collect();
-                add_to_playlist(token.clone(), pid, uris)
-                    .await
-                    .expect("To be able to add songs to playlist");
+                let curr_playlist = playlists.iter().find(|p| p.name == playlist_name).unwrap();
+                let pid = curr_playlist.id.clone();
+                let prompt = format!(
+                    "\nEnter comma-separated numbers to add songs to {}, or q to exit",
+                    playlist_name
+                );
+                println!("{}", prompt);
+                let mut input = String::new();
+                stdout().flush().unwrap();
+                stdin().read_line(&mut input).unwrap();
+                let ids = input.trim();
+                match ids {
+                    "q" => (),
+                    _ => {
+                        let uris: Vec<String> = ids
+                            .split(",")
+                            .map(|id| id.parse::<usize>().unwrap() - 1)
+                            .map(|id| search_res[id].uri.clone())
+                            .collect();
+                        add_to_playlist(token.clone(), pid, uris)
+                            .await
+                            .expect("To be able to add songs to playlist");
+                    }
+                }
             }
         }
     };
