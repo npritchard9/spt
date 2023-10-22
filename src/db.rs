@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
-use surrealdb::engine::local::{Db, File};
+use surrealdb::engine::local::{Db, SpeeDb};
 use surrealdb::Surreal;
 
 use crate::SpotifyAccessToken;
@@ -27,12 +27,12 @@ pub async fn insert_client_credentials(
 ) -> surrealdb::Result<()> {
     let existing_creds: Option<ClientCredentials> = db.select(("app", "creds")).await?;
     if existing_creds.is_some() {
-        let _creds: String = db
+        let _creds: Option<String> = db
             .delete(("app", "creds"))
             .await
             .expect("should be able to delete creds");
     }
-    let _creds: ClientCredentials = db
+    let _creds: Option<ClientCredentials> = db
         .create(("app", "creds"))
         .content(creds)
         .await
@@ -54,7 +54,7 @@ pub async fn insert_token(
     db: &Surreal<Db>,
     old_token: SpotifyAccessToken,
 ) -> surrealdb::Result<()> {
-    let _token: DBToken = db
+    let _token: Option<DBToken> = db
         .create(("token", "noah"))
         .content(DBToken {
             access_token: old_token.access_token,
@@ -83,7 +83,7 @@ pub async fn select_token(db: &Surreal<Db>) -> surrealdb::Result<Option<SpotifyA
 pub async fn check_refresh(db: &Surreal<Db>) -> surrealdb::Result<bool> {
     match db.select(("token", "noah")).await {
         Ok(token) => {
-            let token: DBToken = token;
+            let token: DBToken = token.expect("Token must exist to refresh");
             let curr = SystemTime::now();
             let elapsed = curr.duration_since(token.time).unwrap();
             Ok(elapsed > Duration::new(token.expires_in as u64, 0))
@@ -93,8 +93,11 @@ pub async fn check_refresh(db: &Surreal<Db>) -> surrealdb::Result<bool> {
 }
 
 pub async fn update_token(db: &Surreal<Db>, new_access_token: String) -> surrealdb::Result<()> {
-    let old_token: DBToken = db.select(("token", "noah")).await?;
-    let _new_token: DBToken = db
+    let old_token: DBToken = db
+        .select(("token", "noah"))
+        .await?
+        .expect("Must be an old token to update");
+    let _new_token: Option<DBToken> = db
         .update(("token", "noah"))
         .content(DBToken {
             access_token: new_access_token,
@@ -110,7 +113,7 @@ pub async fn update_token(db: &Surreal<Db>, new_access_token: String) -> surreal
 }
 
 pub async fn get_db() -> surrealdb::Result<Surreal<Db>> {
-    let db = Surreal::new::<File>("/home/noah/.surrealdb/data/spotify.db").await?;
+    let db = Surreal::new::<SpeeDb>("/home/noah/.surrealdb/data/spotify.db").await?;
     db.use_ns("my_ns").use_db("my_db").await?;
 
     Ok(db)

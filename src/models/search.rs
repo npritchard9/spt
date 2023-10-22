@@ -42,7 +42,7 @@ pub struct Item {
     pub name: String,
     pub popularity: i64,
     #[serde(rename = "preview_url")]
-    pub preview_url: String,
+    pub preview_url: Option<String>,
     #[serde(rename = "track_number")]
     pub track_number: i64,
     #[serde(rename = "type")]
